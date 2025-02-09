@@ -28,7 +28,8 @@ def helper_test_op(shps, torch_fxn, tinygrad_fxn=None, atol=1e-6, rtol=1e-3, gra
     for t in tst: t.to_(mt)
 
   st = time.monotonic()
-  ret = tinygrad_fxn(*tst).realize()
+  ret_tg = tinygrad_fxn(*tst)
+  ret = ret_tg.realize()
   tinygrad_fp = time.monotonic() - st
 
   def compare(s, tinygrad_output, torch_output, atol, rtol):
