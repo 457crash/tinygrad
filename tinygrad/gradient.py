@@ -54,10 +54,10 @@ def _deepwalk(root:UOp, targets:set[UOp]) -> list[UOp]:
 
 def compute_gradient_for_expand(expand_node:UOp, grad_ctx:UOp) -> UOp|None:
   parent_src = expand_node.src
-  cast_after_expand = UOp(Ops.CAST, src=(UOp(Ops.NOOP, grad_ctx.dtype, src=parent_src, arg="computing expand gradient"),))
-  expand_node.src = (cast_after_expand,)
-  cast_before_expand = UOp(Ops.CAST, src=(UOp(Ops.NOOP, sum_acc_dtype(grad_ctx.dtype), src=(expand_node,), arg="computing expand gradient"),))
-  targets = set(cast_after_expand.src)
+  cast_after_expand = UOp(Ops.CAST, src=(UOp(Ops.NOOP, grad_ctx.dtype, src=(expand_node,), arg="computing expand gradient"),))
+  expand_node.src = (cast_before_expand,)
+  cast_before_expand = UOp(Ops.CAST, src=(UOp(Ops.NOOP, sum_acc_dtype(grad_ctx.dtype), src=parent_src, arg="computing expand gradient"),))
+  targets = set(cast_before_expand.src)
   gradient_dict = compute_gradient(cast_before_expand, grad_ctx, targets)
   return gradient_dict[list(targets)[0]]
 
@@ -65,7 +65,8 @@ def compute_gradient(root:UOp, root_grad:UOp, targets:set[UOp]) -> dict[UOp, UOp
   grads = {root: root_grad}
   for t0 in reversed(_deepwalk(root, targets)):
     if t0 not in grads: continue
-    if t0.op is Ops.EXPAND and any(x.arg == "computing expand gradient" for x in targets): lgrads: tuple[UOp|None, ...]|None = (compute_gradient_for_expand(t0, grads[t0]),)
+    if t0.op is Ops.EXPAND and any(x.arg == "computing expand gradient" for x in targets): \ 
+    lgrads: tuple[UOp|None, ...]|None = (compute_gradient_for_expand(t0, grads[t0]),)
     else: lgrads = cast(tuple[UOp, ...]|None, pm_gradient.rewrite(t0, ctx=grads[t0]))
     if lgrads is None: raise RuntimeError(f"failed to compute gradient for {t0.op}\n\nin {str(t0)[0:1000]}...")
     assert len(lgrads) == len(t0.src), f"got {len(lgrads)} gradient, expected {len(t0.src)}"
